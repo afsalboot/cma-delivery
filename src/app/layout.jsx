@@ -12,6 +12,7 @@ import {
 import AppLayout from "./components/layout/AppLayout";
 import AppToaster from "./components/ui/AppToaster";
 import { PaymentProvider } from "../context/PaymentContext";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -62,6 +63,7 @@ export default function RootLayout({
             </PaymentProvider>
           </DeliveryProvider>
         </DashboardProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
