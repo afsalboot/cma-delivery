@@ -28,6 +28,35 @@ const formatDateTime = (value) => {
   });
 };
 
+const getDateKey = (value) => {
+  const date = new Date(value);
+
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatDateHeading = (value) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+
+  yesterday.setDate(today.getDate() - 1);
+
+  if (getDateKey(date) === getDateKey(today)) {
+    return "Today";
+  }
+
+  if (getDateKey(date) === getDateKey(yesterday)) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+};
+
 const getPaymentMethodMeta = (paymentMethod) => {
   if (paymentMethod === "CASH") {
     return {
@@ -221,8 +250,8 @@ export default function CustomerCard({
           <p className="truncate text-xs text-zinc-500">{customer?.phone || "-"}</p>
         </div>
 
-        <div className="flex justify-end lg:block">
-          <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300 sm:px-3">
+        <div className="flex items-center justify-center text-center">
+          <span className="inline-flex min-w-24 items-center justify-center rounded-full bg-white/10 px-2.5 py-1 text-center text-xs text-zinc-300 sm:px-3">
             {orders.length} deliver{orders.length === 1 ? "y" : "ies"}
           </span>
         </div>
@@ -313,6 +342,13 @@ export default function CustomerCard({
           </div>
 
           {sortedOrders.map((order, index) => {
+            const orderDate = order.deliveryDate || order.createdAt;
+            const previousOrder = sortedOrders[index - 1];
+            const previousOrderDate =
+              previousOrder?.deliveryDate || previousOrder?.createdAt;
+            const showDateHeading =
+              index === 0 ||
+              getDateKey(orderDate) !== getDateKey(previousOrderDate);
             const paymentMethodMeta = getPaymentMethodMeta(order.paymentMethod);
             const paymentStatusMeta = getPaymentStatusMeta(order);
             const hasCustomerCredit = Number(order.customerCredit || 0) > 0;
@@ -324,10 +360,14 @@ export default function CustomerCard({
             const isPartial = order.paymentStatus === "PARTIAL";
 
             return (
-              <div
-                key={order?._id || `order-${index}`}
-                className="grid gap-3 border-b border-white/5 py-4 transition hover:bg-white/5 lg:grid-cols-6 lg:items-center"
-              >
+              <div key={order?._id || `order-${index}`}>
+                {showDateHeading && (
+                  <div className="border-b border-white/10 bg-zinc-950/40 px-1 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                    {formatDateHeading(orderDate)}
+                  </div>
+                )}
+
+                <div className="grid gap-3 border-b border-white/5 py-4 transition hover:bg-white/5 lg:grid-cols-6 lg:items-center">
                 <div className="flex items-center justify-between gap-3 lg:block">
                   <span className="text-xs text-zinc-500 lg:hidden">ID</span>
                   <span className="truncate text-sm text-zinc-300">
@@ -431,6 +471,7 @@ export default function CustomerCard({
                   >
                     <FiTrash2 size={14} />
                   </button>
+                </div>
                 </div>
               </div>
             );

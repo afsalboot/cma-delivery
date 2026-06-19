@@ -8,6 +8,7 @@ import {
   FiPackage,
   FiPlus,
   FiBarChart2,
+  FiUsers,
 } from "react-icons/fi";
 
 export default function BottomBar() {
@@ -29,6 +30,12 @@ export default function BottomBar() {
       label: "New",
       href: "/deliveries/new",
       icon: FiPlus,
+      featured: true,
+    },
+    {
+      label: "Customers",
+      href: "/customers",
+      icon: FiUsers,
     },
     {
       label: "Reports",
@@ -47,23 +54,30 @@ export default function BottomBar() {
 
             const active =
               pathname ===
-              menu.href;
+                menu.href ||
+              (menu.href !== "/" && pathname?.startsWith(`${menu.href}/`));
 
             return (
               <Link
                 key={menu.href}
                 href={menu.href}
-                className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-2 transition-all ${
-                  active
+                className={`flex flex-col items-center justify-center gap-1 rounded-2xl transition-all ${
+                  menu.featured
+                    ? `-mt-7 size-16 border border-emerald-300/40 bg-emerald-400 text-zinc-950 shadow-xl shadow-emerald-500/25 ${
+                        active ? "scale-105" : "hover:scale-105"
+                      }`
+                    : `px-2.5 py-2 sm:px-4 ${
+                        active
                     ? "bg-white/10 text-white"
                     : "text-zinc-500 hover:text-zinc-300"
+                      }`
                 }`}
               >
                 <Icon
-                  size={20}
+                  size={menu.featured ? 24 : 20}
                 />
 
-                <span className="text-[11px] font-medium">
+                <span className={`font-medium ${menu.featured ? "text-[10px]" : "text-[11px]"}`}>
                   {menu.label}
                 </span>
               </Link>

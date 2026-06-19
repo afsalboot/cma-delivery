@@ -21,6 +21,7 @@ export const getAccountsService = async ({
   search = "",
   type = "",
   method = "",
+  customerId = "",
   fromDate = "",
   toDate = "",
   page = 1,
@@ -38,6 +39,10 @@ export const getAccountsService = async ({
 
   if (method) {
     query.method = method;
+  }
+
+  if (customerId) {
+    query.customer = customerId;
   }
 
   if (dateRange) {
@@ -61,6 +66,11 @@ export const getAccountsService = async ({
       .map((transaction) => transaction.delivery?._id || transaction.delivery)
       .filter(Boolean);
     const openCreditQuery = {
+      ...(customerId
+        ? {
+            customer: customerId,
+          }
+        : {}),
       creditAmount: {
         $gt: 0,
       },

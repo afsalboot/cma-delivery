@@ -12,6 +12,7 @@ export const GET = async (request) => {
       search: searchParams.get("search") || "",
       type: searchParams.get("type") || "",
       method: searchParams.get("method") || "",
+      customerId: searchParams.get("customerId") || "",
       fromDate: searchParams.get("fromDate") || "",
       toDate: searchParams.get("toDate") || "",
       page: searchParams.get("page") || 1,

@@ -113,7 +113,7 @@ export default function PaymentModal({
   ].filter(Boolean);
 
   const [method, setMethod] = useState("CASH");
-  const [receivedAmount, setReceivedAmount] = useState(payableAmount);
+  const [receivedAmount, setReceivedAmount] = useState(String(payableAmount || ""));
   const [extraAction, setExtraAction] = useState("CHANGE");
   const [stateOrderId, setStateOrderId] = useState(order?._id);
 
@@ -121,7 +121,7 @@ export default function PaymentModal({
     setStateOrderId(order._id);
     setMethod("CASH");
     setExtraAction("CHANGE");
-    setReceivedAmount(payableAmount);
+    setReceivedAmount(String(payableAmount || ""));
   }
 
   const paymentMethods = useMemo(
@@ -190,11 +190,11 @@ export default function PaymentModal({
     }
 
     if (nextMethod === "SHOP_CREDIT") {
-      setReceivedAmount(0);
+      setReceivedAmount("");
       return;
     }
 
-    setReceivedAmount(payableAmount);
+    setReceivedAmount(String(payableAmount || ""));
   };
 
   const handleSubmit = () => {
@@ -412,12 +412,18 @@ export default function PaymentModal({
                       INR
                     </span>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
                       value={receivedAmount}
-                      onChange={(event) =>
-                        setReceivedAmount(Number(event.target.value) || 0)
-                      }
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+
+                        if (/^\d*\.?\d*$/.test(nextValue)) {
+                          setReceivedAmount(nextValue);
+                        }
+                      }}
+                      onWheel={(event) => event.currentTarget.blur()}
                       className="h-12 w-full rounded-2xl border border-white/10 bg-zinc-950 pl-14 pr-4 text-xl font-bold text-white outline-none transition focus:border-emerald-400 sm:h-14 sm:text-2xl"
                     />
                   </div>

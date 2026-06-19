@@ -25,8 +25,8 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
 });
 
 const typeLabels = {
-  PAYMENT: "Payment",
-  PAYMENT_RECEIVED: "Payment Received",
+  PAYMENT: "Paid",
+  PAYMENT_RECEIVED: "Paid",
   CREDIT: "Shop Credit",
   CUSTOMER_CREDIT: "Customer Credit",
   CHANGE_GIVEN: "Change Given",
@@ -70,6 +70,35 @@ const formatDateTime = (value) => {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  });
+};
+
+const getDateKey = (value) => {
+  const date = new Date(value);
+
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatDateHeading = (value) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+
+  yesterday.setDate(today.getDate() - 1);
+
+  if (getDateKey(date) === getDateKey(today)) {
+    return "Today";
+  }
+
+  if (getDateKey(date) === getDateKey(yesterday)) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
 };
 
@@ -133,6 +162,24 @@ export default function AccountsPage() {
     ],
     [accounts],
   );
+  const groupedTransactions = useMemo(() => {
+    return accounts.transactions.reduce((groups, transaction) => {
+      const key = getDateKey(transaction.createdAt);
+      const currentGroup = groups.at(-1);
+
+      if (!currentGroup || currentGroup.key !== key) {
+        groups.push({
+          key,
+          label: formatDateHeading(transaction.createdAt),
+          transactions: [transaction],
+        });
+      } else {
+        currentGroup.transactions.push(transaction);
+      }
+
+      return groups;
+    }, []);
+  }, [accounts.transactions]);
 
   const loadAccounts = useCallback(async (nextFilters = filters) => {
     try {
@@ -223,7 +270,7 @@ export default function AccountsPage() {
             Accounts
           </h1>
           <p className="mt-2 text-sm text-zinc-500">
-            All payment, credit, and change transactions.
+            All paid, credit, and change transactions separated by date.
           </p>
         </div>
 
@@ -295,27 +342,37 @@ export default function AccountsPage() {
             ))}
           </select>
 
-          <input
-            type="date"
-            value={filters.fromDate}
-            onChange={(event) => updateFilter("fromDate", event.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
-            aria-label="From date"
-          />
+          <label className="min-w-0">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              From
+            </span>
+            <input
+              type="date"
+              value={filters.fromDate}
+              onChange={(event) => updateFilter("fromDate", event.target.value)}
+              className="h-10 w-full min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
+              aria-label="From date"
+            />
+          </label>
 
-          <input
-            type="date"
-            value={filters.toDate}
-            onChange={(event) => updateFilter("toDate", event.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
-            aria-label="To date"
-          />
+          <label className="min-w-0">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              To
+            </span>
+            <input
+              type="date"
+              value={filters.toDate}
+              onChange={(event) => updateFilter("toDate", event.target.value)}
+              className="h-10 w-full min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
+              aria-label="To date"
+            />
+          </label>
 
           <button
             type="button"
             onClick={resetFilters}
             disabled={!hasActiveFilters}
-            className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 lg:col-span-1"
+            className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 lg:col-span-1 lg:self-end"
           >
             <FiRefreshCcw />
             Reset
@@ -345,14 +402,20 @@ export default function AccountsPage() {
             No transactions found
           </div>
         ) : (
-          accounts.transactions.map((transaction) => (
-            <div
-              key={transaction._id}
-              className="grid gap-3 border-b border-white/5 px-4 py-4 text-sm last:border-b-0 sm:px-5 lg:grid-cols-7 lg:items-center"
-            >
+          groupedTransactions.map((group) => (
+            <div key={group.key}>
+              <div className="border-b border-white/10 bg-zinc-950/70 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300 sm:px-5">
+                {group.label}
+              </div>
+
+              {group.transactions.map((transaction) => (
+                <div
+                  key={transaction._id}
+                  className="grid gap-3 border-b border-white/5 px-4 py-4 text-sm last:border-b-0 sm:px-5 lg:grid-cols-7 lg:items-center"
+                >
               <div className="flex justify-between gap-4 lg:block">
                 <span className="text-xs text-zinc-500 lg:hidden">Date</span>
-                <span className="text-zinc-300">
+                <span className="text-right text-zinc-300 lg:text-left">
                   {formatDateTime(transaction.createdAt)}
                 </span>
               </div>
@@ -366,7 +429,7 @@ export default function AccountsPage() {
 
               <div className="flex justify-between gap-4 lg:block">
                 <span className="text-xs text-zinc-500 lg:hidden">Invoice</span>
-                <span className="text-zinc-400">
+                <span className="text-right text-zinc-400 lg:text-left">
                   {transaction.delivery?.invoiceNumber || "-"}
                 </span>
               </div>
@@ -403,6 +466,8 @@ export default function AccountsPage() {
                   {formatCurrency(transaction.amount)}
                 </span>
               </div>
+                </div>
+              ))}
             </div>
           ))
         )}

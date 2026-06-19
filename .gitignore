@@ -20,6 +20,11 @@
 # production
 /build
 
+# Android release signing (never commit credentials or keystores)
+/android/keystore.properties
+*.jks
+*.keystore
+
 # misc
 .DS_Store
 *.pem

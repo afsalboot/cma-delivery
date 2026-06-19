@@ -1,5 +1,37 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Android app
+
+The Android project uses Capacitor and loads the production app from
+`https://cma-delivery.vercel.app`. The package ID is `com.cma.delivery`.
+
+Create and install a debug APK:
+
+```powershell
+npm run android:debug
+```
+
+The APK is written to:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+For a signed Play Store bundle, copy
+`android/keystore.properties.example` to `android/keystore.properties` and
+replace the placeholder alias and passwords. The keystore properties file and
+all `.jks` files are ignored by Git.
+
+```powershell
+npm run android:release
+```
+
+The signed bundle is written to:
+
+```text
+android/app/build/outputs/bundle/release/app-release.aab
+```
+
 ## Getting Started
 
 First, run the development server:

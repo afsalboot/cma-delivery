@@ -87,6 +87,20 @@ export default function NewDelivery() {
     }));
   };
 
+  const handleNumericChange = (event, { integer = false } = {}) => {
+    const nextValue = event.target.value;
+    const numericPattern = integer ? /^\d*$/ : /^\d*\.?\d*$/;
+
+    if (!numericPattern.test(nextValue)) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      [event.target.name]: nextValue,
+    }));
+  };
+
   const handleCustomerSearch = async (value) => {
     setForm((current) => ({
       ...current,
@@ -336,11 +350,11 @@ export default function NewDelivery() {
               <Field label="Amount">
                 <input
                   name="totalAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.]?[0-9]*"
                   value={form.totalAmount}
-                  onChange={handleChange}
+                  onChange={handleNumericChange}
                   required
                   className={inputClassName}
                   placeholder="Enter amount"
@@ -352,28 +366,28 @@ export default function NewDelivery() {
                   <Field label="Kg">
                     <input
                       name="kg"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
                       value={form.kg}
-                      onChange={handleChange}
+                      onChange={handleNumericChange}
                       required
                       className={inputClassName}
-                      placeholder="0"
+                      placeholder="Enter kg"
                     />
                   </Field>
 
                   <Field label="Rate / kg">
                     <input
                       name="rate"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
                       value={form.rate}
-                      onChange={handleChange}
+                      onChange={handleNumericChange}
                       required
                       className={inputClassName}
-                      placeholder="0"
+                      placeholder="Enter rate"
                     />
                   </Field>
                 </div>
@@ -381,14 +395,18 @@ export default function NewDelivery() {
                 <Field label="Chicken count">
                   <input
                     name="chickenCount"
-                    type="number"
-                    min="1"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={form.chickenCount}
-                    onChange={handleChange}
+                    onChange={(event) =>
+                      handleNumericChange(event, {
+                        integer: true,
+                      })
+                    }
                     required
                     className={inputClassName}
-                    placeholder="1"
+                    placeholder="Enter count"
                   />
                 </Field>
 

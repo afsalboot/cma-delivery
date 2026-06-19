@@ -71,8 +71,8 @@ const methodColors = {
 };
 
 const typeLabels = {
-  PAYMENT: "Payment",
-  PAYMENT_RECEIVED: "Payment Received",
+  PAYMENT: "Paid",
+  PAYMENT_RECEIVED: "Paid",
   CREDIT: "Shop Credit",
   CUSTOMER_CREDIT: "Customer Credit",
   CHANGE_GIVEN: "Change Given",
@@ -371,15 +371,16 @@ const AccountsPreview = ({ transactions = [] }) => (
       <div>
         <h2 className="font-semibold text-white">Accounts</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Latest payment and credit transactions
+          Latest paid and credit transactions
         </p>
       </div>
 
       <Link
         href="/accounts"
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-sm font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white lg:w-auto lg:gap-2 lg:px-3"
+        aria-label="Show all accounts"
       >
-        Show all
+        <span className="hidden lg:inline">Show all</span>
         <FiArrowRight />
       </Link>
     </div>

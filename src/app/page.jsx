@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   FiAlertCircle,
+  FiCalendar,
   FiCheckCircle,
   FiClock,
   FiCreditCard,
   FiDollarSign,
+  FiMapPin,
+  FiPhone,
   FiRefreshCcw,
   FiTruck,
 } from "react-icons/fi";
@@ -29,6 +32,18 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
 });
 
 const formatCurrency = (value) => currencyFormatter.format(Number(value || 0));
+
+const formatDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 const StatCard = ({ label, value, helper, icon: Icon, tone = "zinc" }) => {
   const tones = {
@@ -86,6 +101,90 @@ const OrderSection = ({ title, count, tone, children, emptyText }) => (
   </section>
 );
 
+const CreditCustomerRow = ({ order, amount }) => (
+  <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-semibold text-white">
+          {order.customer?.name || "Unknown Customer"}
+        </p>
+        <div className="mt-2 grid gap-1 text-xs text-zinc-500">
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <FiPhone className="shrink-0" />
+            <span className="truncate">{order.customer?.phone || "-"}</span>
+          </span>
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <FiMapPin className="shrink-0" />
+            <span className="truncate">
+              {order.customer?.place || order.place || "-"}
+            </span>
+          </span>
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <FiCalendar className="shrink-0" />
+            <span className="truncate">
+              {formatDate(order.deliveryDate || order.createdAt)}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div className="shrink-0 text-right">
+        <p className="text-[11px] uppercase tracking-wide text-zinc-600">
+          Amount
+        </p>
+        <p className="mt-1 font-bold text-white">{formatCurrency(amount)}</p>
+      </div>
+    </div>
+  </div>
+);
+
+const CreditDashboardCard = ({
+  title,
+  helper,
+  orders = [],
+  tone,
+  emptyText,
+  getAmount,
+}) => {
+  const total = orders.reduce((sum, order) => sum + Number(getAmount(order) || 0), 0);
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.04]">
+      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div>
+          <h2 className="font-semibold text-white">{title}</h2>
+          <p className="mt-1 text-xs text-zinc-500">{helper}</p>
+        </div>
+
+        <div className="text-right">
+          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${tone}`}>
+            {orders.length}
+          </span>
+          <p className="mt-2 text-sm font-bold text-white">
+            {formatCurrency(total)}
+          </p>
+        </div>
+      </div>
+
+      <div className="max-h-[440px] space-y-3 overflow-y-auto p-4">
+        {orders.length > 0 ? (
+          orders.map((order) => (
+            <CreditCustomerRow
+              key={order._id}
+              order={order}
+              amount={getAmount(order)}
+            />
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-zinc-500">
+            {emptyText}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
 export default function Home() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -94,6 +193,7 @@ export default function Home() {
     stats,
     todayPending,
     todayCredit,
+    customerCredits,
     loading,
     loadDashboard,
   } = useDashboard();
@@ -302,6 +402,26 @@ export default function Home() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
+        <CreditDashboardCard
+          title="Credit"
+          helper="Customers who purchased on shop credit"
+          orders={todayCredit || []}
+          tone="bg-amber-400/10 text-amber-300"
+          emptyText="No credit purchases today"
+          getAmount={(order) => order.creditAmount || order.totalAmount}
+        />
+
+        <CreditDashboardCard
+          title="Customer Credit"
+          helper="Amount to give back or settle with customers"
+          orders={customerCredits || []}
+          tone="bg-violet-400/10 text-violet-300"
+          emptyText="No customer credit pending"
+          getAmount={(order) => order.customerCredit}
+        />
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
         <OrderSection
           title="Pending Orders"
           count={todayPending?.length || 0}
@@ -318,24 +438,31 @@ export default function Home() {
           ))}
         </OrderSection>
 
-        <OrderSection
-          title="Credit Orders"
-          count={todayCredit?.length || 0}
-          tone="bg-amber-400/10 text-amber-300"
-          emptyText="No credit orders for today"
-        >
-          {todayCredit?.map((order) => (
-            <OrderCard
-              key={order._id}
-              order={{
-                ...order,
-                totalAmount: order.creditAmount || order.totalAmount,
-              }}
-              showPayButton
-              onPayment={handlePaymentClick}
-            />
-          ))}
-        </OrderSection>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+          <h2 className="font-semibold text-white">Credit Summary</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Use the Credit and Customer Credit cards above for customer-wise details.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-zinc-950/70 p-4">
+              <p className="text-xs text-zinc-500">Shop credit today</p>
+              <p className="mt-1 text-xl font-bold text-amber-300">
+                {formatCurrency(creditTotal)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-zinc-950/70 p-4">
+              <p className="text-xs text-zinc-500">Customer credit pending</p>
+              <p className="mt-1 text-xl font-bold text-violet-300">
+                {formatCurrency(
+                  (customerCredits || []).reduce(
+                    (sum, order) => sum + Number(order.customerCredit || 0),
+                    0,
+                  ),
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <PaymentModal

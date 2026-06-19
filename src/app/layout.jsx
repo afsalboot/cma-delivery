@@ -24,9 +24,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Delivery Management System",
+  title: "CMA Delivery",
   description:
     "Delivery tracking and revenue management dashboard",
+  applicationName: "CMA Delivery",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CMA Delivery",
+  },
   icons: {
     icon: {
       url: "/favicon-32x32.png",
@@ -35,6 +41,14 @@ export const metadata = {
     },
     shortcut: "/favicon-32x32.png",
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#09090b",
 };
 
 export default function RootLayout({

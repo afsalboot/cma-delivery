@@ -1,37 +1,66 @@
+import Counter from "../models/Counter";
 import Delivery from "../models/Delivery";
 
-const getDateTimePart = () => {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(
-    date.getMonth() + 1,
-  ).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
+const getInvoiceSequence = (invoiceNumber) => {
+  const match = String(invoiceNumber || "").match(/^INV-(?:\d{12}-)?(\d+)$/);
 
-  return `${year}${month}${day}${hours}${minutes}`;
+  return Number(match?.[1] || 0);
 };
 
 const generateInvoiceNumber = async () => {
-  const dateTimePart = getDateTimePart();
-  const prefix = `INV-${dateTimePart}-`;
-  const latestInvoice = await Delivery.findOne({
+  const counterId = "invoice";
+  const invoices = await Delivery.find({
     invoiceNumber: {
-      $regex: `^${prefix}\\d{4}$`,
+      $regex: /^INV-(?:\d{12}-)?\d+$/,
     },
   })
-    .sort({
-      invoiceNumber: -1,
-    })
     .select("invoiceNumber")
     .lean();
-  const latestSequence = Number(
-    latestInvoice?.invoiceNumber?.split("-").at(-1) || 0,
-  );
-  const nextSequence = String(latestSequence + 1).padStart(4, "0");
+  const latestSequence = invoices.reduce((highest, invoice) => {
+    return Math.max(highest, getInvoiceSequence(invoice.invoiceNumber));
+  }, 0);
 
-  return `${prefix}${nextSequence}`;
+  const existingCounter = await Counter.findById(counterId).lean();
+
+  if (!existingCounter) {
+    try {
+      await Counter.create({
+        _id: counterId,
+        sequence: latestSequence,
+      });
+    } catch (error) {
+      if (error?.code !== 11000) {
+        throw error;
+      }
+    }
+  } else if (Number(existingCounter.sequence || 0) < latestSequence) {
+    await Counter.updateOne(
+      {
+        _id: counterId,
+      },
+      {
+        $set: {
+          sequence: latestSequence,
+        },
+      },
+    );
+  }
+
+  const counter = await Counter.findByIdAndUpdate(
+    counterId,
+    {
+      $inc: {
+        sequence: 1,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+    },
+  );
+  const nextSequence = String(counter.sequence).padStart(4, "0");
+
+  return `INV-${nextSequence}`;
 };
 
 export default generateInvoiceNumber;

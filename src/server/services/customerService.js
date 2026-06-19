@@ -58,12 +58,40 @@ export const getCustomerByIdService =
 
 export const updateCustomerService =
   async (id, payload) => {
+    const name = payload.name?.trim();
+    const phone = payload.phone?.trim();
+    const place = payload.place?.trim();
+    const update = {
+      $set: {
+        ...(name
+          ? {
+              name,
+              normalizedName: normalizeText(name),
+            }
+          : {}),
+        place: place || "",
+        normalizedPlace: normalizeText(place),
+      },
+      $unset: {},
+    };
+
+    if (phone) {
+      update.$set.phone = phone;
+    } else {
+      update.$unset.phone = "";
+    }
+
+    if (Object.keys(update.$unset).length === 0) {
+      delete update.$unset;
+    }
+
     const customer =
       await Customer.findByIdAndUpdate(
         id,
-        payload,
+        update,
         {
           new: true,
+          runValidators: true,
         }
       );
 

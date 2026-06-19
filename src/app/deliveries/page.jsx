@@ -28,6 +28,37 @@ import PageLoader from "../components/ui/Loader";
 
 const CUSTOMERS_PER_PAGE = 10;
 
+const getDeliveryDate = (order) => order.deliveryDate || order.createdAt;
+
+const getDateKey = (value) => {
+  const date = new Date(value);
+
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatDateHeading = (value) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+
+  yesterday.setDate(today.getDate() - 1);
+
+  if (getDateKey(date) === getDateKey(today)) {
+    return "Today";
+  }
+
+  if (getDateKey(date) === getDateKey(yesterday)) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+};
+
 export default function DeliveriesPage() {
   const router = useRouter();
 
@@ -328,7 +359,7 @@ export default function DeliveriesPage() {
       : null;
 
     return deliveries.filter((order) => {
-      const orderDate = new Date(order.deliveryDate || order.createdAt);
+      const orderDate = new Date(getDeliveryDate(order));
       const orderTime = orderDate.getTime();
       const searchableText = [
         order.invoiceNumber,
@@ -371,36 +402,72 @@ export default function DeliveriesPage() {
     });
   }, [deliveries, filters]);
 
-  const grouped = Object.values(
-    filteredDeliveries.reduce((acc, order, index) => {
-      const customerId = order?.customer?._id || `unknown-${index}`;
+  const dateCustomerGroups = useMemo(() => {
+    const groups = [];
+    const groupMap = new Map();
 
-      if (!acc[customerId]) {
-        acc[customerId] = {
+    [...filteredDeliveries]
+      .sort((first, second) => {
+        return new Date(getDeliveryDate(second)) - new Date(getDeliveryDate(first));
+      })
+      .forEach((order, index) => {
+        const dateKey = getDateKey(getDeliveryDate(order));
+      const customerId = order?.customer?._id || `unknown-${index}`;
+        const groupKey = `${dateKey}:${customerId}`;
+
+        if (!groupMap.has(groupKey)) {
+          const group = {
+            key: groupKey,
+            dateKey,
+            dateLabel: formatDateHeading(getDeliveryDate(order)),
           customer: order?.customer || {
             _id: customerId,
             name: "Unknown Customer",
             phone: "-",
           },
           orders: [],
-        };
-      }
+          };
 
-      acc[customerId].orders.push(order);
+          groupMap.set(groupKey, group);
+          groups.push(group);
+        }
 
-      return acc;
-    }, {}),
+        groupMap.get(groupKey).orders.push(order);
+      });
+
+    return groups;
+  }, [filteredDeliveries]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(dateCustomerGroups.length / CUSTOMERS_PER_PAGE),
   );
-
-  const totalPages = Math.max(1, Math.ceil(grouped.length / CUSTOMERS_PER_PAGE));
   const activePage = Math.min(currentPage, totalPages);
   const pageStart = (activePage - 1) * CUSTOMERS_PER_PAGE;
-  const paginatedGroups = grouped.slice(
+  const paginatedGroups = dateCustomerGroups.slice(
     pageStart,
     pageStart + CUSTOMERS_PER_PAGE,
   );
-  const pageFirstItem = grouped.length === 0 ? 0 : pageStart + 1;
-  const pageLastItem = Math.min(pageStart + CUSTOMERS_PER_PAGE, grouped.length);
+  const paginatedDateGroups = paginatedGroups.reduce((groups, group) => {
+    const currentGroup = groups.at(-1);
+
+    if (!currentGroup || currentGroup.key !== group.dateKey) {
+      groups.push({
+        key: group.dateKey,
+        label: group.dateLabel,
+        groups: [group],
+      });
+    } else {
+      currentGroup.groups.push(group);
+    }
+
+    return groups;
+  }, []);
+  const pageFirstItem = dateCustomerGroups.length === 0 ? 0 : pageStart + 1;
+  const pageLastItem = Math.min(
+    pageStart + CUSTOMERS_PER_PAGE,
+    dateCustomerGroups.length,
+  );
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
   const dialogCustomerName =
@@ -486,27 +553,37 @@ export default function DeliveriesPage() {
               ))}
             </select>
 
-            <input
-              type="date"
-              value={filters.fromDate}
-              onChange={(event) => updateFilter("fromDate", event.target.value)}
-              className="h-10 min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
-              aria-label="From date"
-            />
+            <label className="min-w-0">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                From
+              </span>
+              <input
+                type="date"
+                value={filters.fromDate}
+                onChange={(event) => updateFilter("fromDate", event.target.value)}
+                className="h-10 w-full min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
+                aria-label="From date"
+              />
+            </label>
 
-            <input
-              type="date"
-              value={filters.toDate}
-              onChange={(event) => updateFilter("toDate", event.target.value)}
-              className="h-10 min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
-              aria-label="To date"
-            />
+            <label className="min-w-0">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                To
+              </span>
+              <input
+                type="date"
+                value={filters.toDate}
+                onChange={(event) => updateFilter("toDate", event.target.value)}
+                className="h-10 w-full min-w-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 text-sm text-white outline-none transition focus:border-emerald-500 sm:px-3"
+                aria-label="To date"
+              />
+            </label>
 
             <button
               type="button"
               onClick={resetFilters}
               disabled={!hasActiveFilters}
-              className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 lg:col-span-1"
+              className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm font-medium text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 lg:col-span-1 lg:self-end"
             >
               <FiRefreshCcw />
               Reset
@@ -514,32 +591,41 @@ export default function DeliveriesPage() {
           </div>
         </div>
 
-        {grouped.length === 0 ? (
+        {dateCustomerGroups.length === 0 ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-10 text-center text-zinc-500">
             No deliveries found
           </div>
         ) : (
           <>
-            {paginatedGroups.map((group, index) => (
-              <CustomerCard
-                key={group.customer?._id || `customer-${pageStart + index}`}
-                customer={group.customer}
-                orders={group.orders}
-                onViewCustomer={(customer) =>
-                  router.push(`/deliveries/customer/${customer._id}`)
-                }
-                onView={(order) => router.push(`/deliveries/${order._id}`)}
-                onDelete={(order) => handleDelete(order._id)}
-                onDeleteCustomer={handleCustomerDelete}
-                onPayment={handlePaymentClick}
-                onSettleCustomerCredit={handleSettleCustomerCredit}
-                onWhatsapp={handleWhatsapp}
-              />
+            {paginatedDateGroups.map((dateGroup) => (
+              <section key={dateGroup.key} className="space-y-3">
+                <div className="sticky top-20 z-10 rounded-2xl border border-white/10 bg-zinc-950/90 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300 backdrop-blur-xl">
+                  {dateGroup.label}
+                </div>
+
+                {dateGroup.groups.map((group) => (
+                  <CustomerCard
+                    key={group.key}
+                    customer={group.customer}
+                    orders={group.orders}
+                    onViewCustomer={(customer) =>
+                      router.push(`/deliveries/customer/${customer._id}`)
+                    }
+                    onView={(order) => router.push(`/deliveries/${order._id}`)}
+                    onDelete={(order) => handleDelete(order._id)}
+                    onDeleteCustomer={handleCustomerDelete}
+                    onPayment={handlePaymentClick}
+                    onSettleCustomerCredit={handleSettleCustomerCredit}
+                    onWhatsapp={handleWhatsapp}
+                  />
+                ))}
+              </section>
             ))}
 
             <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Showing {pageFirstItem}-{pageLastItem} of {grouped.length} customers
+                Showing {pageFirstItem}-{pageLastItem} of{" "}
+                {dateCustomerGroups.length} customer groups
               </span>
 
               <div className="flex items-center justify-between gap-2 sm:justify-end">
