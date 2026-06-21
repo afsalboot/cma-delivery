@@ -57,7 +57,9 @@ export default function CustomersPage() {
   }, []);
 
   useEffect(() => {
-    loadCustomers();
+    const timeoutId = window.setTimeout(loadCustomers, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadCustomers]);
 
   const filteredCustomers = useMemo(() => {
@@ -183,49 +185,49 @@ export default function CustomersPage() {
           No customers found
         </div>
       ) : (
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {filteredCustomers.map((customer) => (
             <div
               key={customer._id}
-              className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl transition hover:border-emerald-400/30 hover:bg-white/[0.07]"
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition hover:border-emerald-400/30 hover:bg-white/[0.07]"
             >
               <button
                 type="button"
                 onClick={() => router.push(`/customers/${customer._id}`)}
                 className="block w-full text-left"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h2 className="truncate text-lg font-semibold text-white">
+                    <h2 className="truncate text-base font-semibold text-white">
                       {customer.name || "Unknown Customer"}
                     </h2>
-                    <div className="mt-2 space-y-1 text-sm text-zinc-400">
+                    <div className="mt-1.5 space-y-1 text-xs text-zinc-400">
                       <p className="flex items-center gap-2">
-                        <FiPhone className="shrink-0 text-zinc-500" />
+                        <FiPhone className="shrink-0 text-zinc-500" size={13} />
                         <span className="truncate">{customer.phone || "-"}</span>
                       </p>
                       <p className="flex items-center gap-2">
-                        <FiMapPin className="shrink-0 text-zinc-500" />
+                        <FiMapPin className="shrink-0 text-zinc-500" size={13} />
                         <span className="truncate">{customer.place || "-"}</span>
                       </p>
                     </div>
                   </div>
 
-                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                  <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-zinc-300">
                     {customer.totalOrders || 0} orders
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-xl bg-zinc-950/70 p-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-2 text-xs">
+                  <div className="min-w-0">
                     <p className="text-xs text-zinc-500">Spent</p>
-                    <p className="mt-1 break-words font-bold text-white">
+                    <p className="mt-0.5 truncate font-bold text-white">
                       {formatCurrency(customer.totalSpent)}
                     </p>
                   </div>
-                  <div className="rounded-xl bg-zinc-950/70 p-3">
+                  <div className="min-w-0 text-right">
                     <p className="text-xs text-zinc-500">Due</p>
-                    <p className="mt-1 break-words font-bold text-amber-300">
+                    <p className="mt-0.5 truncate font-bold text-amber-300">
                       {formatCurrency(customer.totalCredit)}
                     </p>
                   </div>
@@ -235,10 +237,10 @@ export default function CustomersPage() {
               <button
                 type="button"
                 onClick={() => openEdit(customer)}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-sm font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/10 text-xs font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
               >
                 <FiEdit2 size={15} />
-                Edit customer
+                Edit
               </button>
             </div>
           ))}

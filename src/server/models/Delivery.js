@@ -93,6 +93,21 @@ const DeliverySchema = new mongoose.Schema(
       default: 0,
     },
 
+    deliveryBoyPayoutAmount: {
+      type: Number,
+      default: 10,
+    },
+
+    deliveryBoyPayoutPaid: {
+      type: Boolean,
+      default: false,
+    },
+
+    deliveryBoyPayoutPaidAt: {
+      type: Date,
+      default: null,
+    },
+
     paymentMethod: {
       type: String,
       enum: [

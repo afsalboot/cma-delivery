@@ -27,6 +27,7 @@ const formatCurrency = (value) =>
 const methodTone = {
   CASH: "border-emerald-400/50 bg-emerald-400/10 text-emerald-200",
   GPAY: "border-sky-400/50 bg-sky-400/10 text-sky-200",
+  MIXED: "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-200",
   SHOP_CREDIT: "border-amber-400/50 bg-amber-400/10 text-amber-200",
   CUSTOMER_CREDIT: "border-violet-400/50 bg-violet-400/10 text-violet-200",
 };
@@ -114,6 +115,8 @@ export default function PaymentModal({
 
   const [method, setMethod] = useState("CASH");
   const [receivedAmount, setReceivedAmount] = useState(String(payableAmount || ""));
+  const [cashAmount, setCashAmount] = useState("");
+  const [gpayAmount, setGpayAmount] = useState(String(payableAmount || ""));
   const [extraAction, setExtraAction] = useState("CHANGE");
   const [stateOrderId, setStateOrderId] = useState(order?._id);
 
@@ -122,6 +125,8 @@ export default function PaymentModal({
     setMethod("CASH");
     setExtraAction("CHANGE");
     setReceivedAmount(String(payableAmount || ""));
+    setCashAmount("");
+    setGpayAmount(String(payableAmount || ""));
   }
 
   const paymentMethods = useMemo(
@@ -137,6 +142,12 @@ export default function PaymentModal({
         label: "GPay",
         icon: SiGooglepay,
         helper: "Online transfer",
+      },
+      {
+        value: "MIXED",
+        label: "Cash + GPay",
+        icon: FiCreditCard,
+        helper: "Split received amount",
       },
       {
         value: "SHOP_CREDIT",
@@ -163,7 +174,9 @@ export default function PaymentModal({
       ? usableCustomerCredit
       : method === "SHOP_CREDIT"
         ? 0
-        : Number(receivedAmount || 0);
+        : method === "MIXED"
+          ? Number(cashAmount || 0) + Number(gpayAmount || 0)
+          : Number(receivedAmount || 0);
 
   const difference = useMemo(() => {
     return Number(displayReceivedAmount || 0) - Number(payableAmount || 0);
@@ -194,7 +207,41 @@ export default function PaymentModal({
       return;
     }
 
+    if (nextMethod === "MIXED") {
+      setCashAmount("");
+      setGpayAmount(String(payableAmount || ""));
+      setReceivedAmount(String(payableAmount || ""));
+      return;
+    }
+
     setReceivedAmount(String(payableAmount || ""));
+  };
+
+  const updateMoneyValue = (setter) => (event) => {
+    const nextValue = event.target.value;
+
+    if (/^\d*\.?\d*$/.test(nextValue)) {
+      setter(nextValue);
+    }
+  };
+
+  const getAppliedSplitAmounts = () => {
+    const rawCashAmount = Number(cashAmount || 0);
+    const rawGpayAmount = Number(gpayAmount || 0);
+    const appliedAmount =
+      extraAmount > 0 && extraAction === "CHANGE"
+        ? payableAmount
+        : displayReceivedAmount;
+    const appliedCashAmount = Math.min(rawCashAmount, appliedAmount);
+    const appliedGpayAmount = Math.min(
+      rawGpayAmount,
+      Math.max(appliedAmount - appliedCashAmount, 0),
+    );
+
+    return {
+      cashAmount: appliedCashAmount,
+      gpayAmount: appliedGpayAmount,
+    };
   };
 
   const handleSubmit = () => {
@@ -202,9 +249,18 @@ export default function PaymentModal({
       return;
     }
 
+    const splitAmounts =
+      method === "MIXED"
+        ? getAppliedSplitAmounts()
+        : {
+            cashAmount: 0,
+            gpayAmount: 0,
+          };
+
     onSubmit({
       method,
       receivedAmount: displayReceivedAmount,
+      ...splitAmounts,
       extraAction,
       totalAmount: payableAmount,
       deliveryId: order._id,
@@ -403,30 +459,67 @@ export default function PaymentModal({
                 </div>
               ) : (
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">
-                    Amount received
-                  </label>
+                  {method === "MIXED" ? (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-white">
+                        Split amount received
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-zinc-500">
+                          Cash
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*[.]?[0-9]*"
+                          value={cashAmount}
+                          onChange={updateMoneyValue(setCashAmount)}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm font-bold text-white outline-none transition focus:border-emerald-400"
+                          placeholder="0"
+                        />
+                      </label>
 
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-zinc-500">
-                      INR
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      pattern="[0-9]*[.]?[0-9]*"
-                      value={receivedAmount}
-                      onChange={(event) => {
-                        const nextValue = event.target.value;
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-zinc-500">
+                          GPay
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*[.]?[0-9]*"
+                          value={gpayAmount}
+                          onChange={updateMoneyValue(setGpayAmount)}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-400"
+                          placeholder="0"
+                        />
+                      </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="mb-2 block text-sm font-semibold text-white">
+                        Amount received
+                      </label>
 
-                        if (/^\d*\.?\d*$/.test(nextValue)) {
-                          setReceivedAmount(nextValue);
-                        }
-                      }}
-                      onWheel={(event) => event.currentTarget.blur()}
-                      className="h-12 w-full rounded-2xl border border-white/10 bg-zinc-950 pl-14 pr-4 text-xl font-bold text-white outline-none transition focus:border-emerald-400 sm:h-14 sm:text-2xl"
-                    />
-                  </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-zinc-500">
+                          INR
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*[.]?[0-9]*"
+                          value={receivedAmount}
+                          onChange={updateMoneyValue(setReceivedAmount)}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          className="h-12 w-full rounded-2xl border border-white/10 bg-zinc-950 pl-14 pr-4 text-xl font-bold text-white outline-none transition focus:border-emerald-400 sm:h-14 sm:text-2xl"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {isPartialCashPayment && (
                     <p className="mt-2 text-xs text-orange-300">

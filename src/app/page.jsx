@@ -247,6 +247,8 @@ export default function Home() {
     totalAmount,
     extraAction,
     creditAmount,
+    cashAmount,
+    gpayAmount,
   }) => {
     try {
       if (method === "SHOP_CREDIT") {
@@ -262,18 +264,24 @@ export default function Home() {
           deliveryId,
           amount: totalAmount,
           method,
+          cashAmount,
+          gpayAmount,
         });
       } else if (receivedAmount < totalAmount) {
         await receivePayment({
           deliveryId,
           amount: receivedAmount,
           method,
+          cashAmount,
+          gpayAmount,
         });
       } else if (extraAction === "CHANGE") {
         await receivePayment({
           deliveryId,
           amount: totalAmount,
           method,
+          cashAmount,
+          gpayAmount,
           changeGiven: receivedAmount - totalAmount,
         });
       } else {
@@ -281,6 +289,8 @@ export default function Home() {
           deliveryId,
           paidAmount: receivedAmount,
           method,
+          cashAmount,
+          gpayAmount,
         });
       }
 

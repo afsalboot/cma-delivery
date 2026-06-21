@@ -33,7 +33,14 @@ const TransactionSchema = new mongoose.Schema(
 
     method: {
       type: String,
-      enum: ["CASH", "GPAY", "CREDIT", "SHOP_CREDIT", "CUSTOMER_CREDIT"],
+      enum: [
+        "CASH",
+        "GPAY",
+        "CREDIT",
+        "SHOP_CREDIT",
+        "CUSTOMER_CREDIT",
+        "MIXED",
+      ],
       required: true,
     },
 

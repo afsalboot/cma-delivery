@@ -44,3 +44,15 @@ export const getMonthlyRevenueChart =
 
     return res.data;
   };
+
+export const takeDeliveryBoyPayout =
+  async ({ period }) => {
+    const res = await api.post(
+      "/reports/delivery-boy-payout",
+      {
+        period,
+      },
+    );
+
+    return res.data;
+  };

@@ -17,6 +17,65 @@ const getDateRange = ({ fromDate, toDate }) => {
   return Object.keys(createdAt).length > 0 ? createdAt : null;
 };
 
+const getDeliveryKey = (transaction) =>
+  String(transaction.delivery?._id || transaction.delivery || "");
+
+const serializeTransaction = (transaction) =>
+  typeof transaction.toObject === "function" ? transaction.toObject() : transaction;
+
+const mergeCustomerCreditTransactions = (transactions) => {
+  const paymentDeliveryKeys = new Set(
+    transactions
+      .filter((transaction) => transaction.type === "PAYMENT")
+      .map(getDeliveryKey)
+      .filter(Boolean),
+  );
+  const creditByDelivery = transactions.reduce((acc, transaction) => {
+    if (transaction.type !== "CUSTOMER_CREDIT") {
+      return acc;
+    }
+
+    const deliveryKey = getDeliveryKey(transaction);
+
+    if (deliveryKey) {
+      acc.set(deliveryKey, transaction);
+    }
+
+    return acc;
+  }, new Map());
+
+  return transactions.reduce((items, transaction) => {
+    const deliveryKey = getDeliveryKey(transaction);
+    const pairedCredit =
+      transaction.type === "PAYMENT" && deliveryKey
+        ? creditByDelivery.get(deliveryKey)
+        : null;
+
+    if (pairedCredit) {
+      items.push({
+        ...serializeTransaction(transaction),
+        customerCreditCreated: Number(pairedCredit.amount || 0),
+        customerCreditTransactionId: pairedCredit._id,
+        notes: [transaction.notes, pairedCredit.notes]
+          .filter(Boolean)
+          .join(" · "),
+      });
+      return items;
+    }
+
+    if (
+      transaction.type === "CUSTOMER_CREDIT" &&
+      deliveryKey &&
+      paymentDeliveryKeys.has(deliveryKey)
+    ) {
+      return items;
+    }
+
+    items.push(transaction);
+    return items;
+  }, []);
+};
+
 export const getAccountsService = async ({
   search = "",
   type = "",
@@ -133,16 +192,18 @@ export const getAccountsService = async ({
     });
   }
 
-  const totalAmount = transactions.reduce(
-    (sum, transaction) => sum + Number(transaction.amount || 0),
-    0,
-  );
-
   const typeSummary = transactions.reduce((acc, transaction) => {
     const key = transaction.type || "UNKNOWN";
     acc[key] = (acc[key] || 0) + Number(transaction.amount || 0);
     return acc;
   }, {});
+
+  transactions = mergeCustomerCreditTransactions(transactions);
+
+  const totalAmount = transactions.reduce(
+    (sum, transaction) => sum + Number(transaction.amount || 0),
+    0,
+  );
 
   const parsedPage = Math.max(1, Number(page || 1));
   const parsedLimit = Math.max(0, Number(limit || 0));

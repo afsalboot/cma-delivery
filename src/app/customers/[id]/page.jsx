@@ -121,7 +121,9 @@ export default function CustomerDetailPage() {
   }, [customerId]);
 
   useEffect(() => {
-    loadCustomerHistory();
+    const timeoutId = window.setTimeout(loadCustomerHistory, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadCustomerHistory]);
 
   const groupedTransactions = useMemo(() => {
@@ -281,13 +283,20 @@ export default function CustomerDetailPage() {
 
                   <div className="flex justify-between gap-4 lg:block">
                     <span className="text-xs text-zinc-500 lg:hidden">Type</span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs ${
-                        typeColors[transaction.type] ||
-                        "bg-white/10 text-zinc-300"
-                      }`}
-                    >
-                      {typeLabels[transaction.type] || transaction.type}
+                    <span className="inline-flex flex-wrap justify-end gap-1.5 lg:justify-start">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs ${
+                          typeColors[transaction.type] ||
+                          "bg-white/10 text-zinc-300"
+                        }`}
+                      >
+                        {typeLabels[transaction.type] || transaction.type}
+                      </span>
+                      {Number(transaction.customerCreditCreated || 0) > 0 && (
+                        <span className="rounded-full bg-violet-500/15 px-2.5 py-1 text-xs text-violet-300">
+                          Credit +{formatCurrency(transaction.customerCreditCreated)}
+                        </span>
+                      )}
                     </span>
                   </div>
 

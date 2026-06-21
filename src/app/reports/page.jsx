@@ -3,16 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Area,
+  Legend,
   Bar,
+  Cell,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import toast from "react-hot-toast";
 import {
   FiActivity,
   FiArrowRight,
@@ -22,10 +27,13 @@ import {
   FiRefreshCcw,
   FiShoppingBag,
   FiTrendingUp,
+  FiTruck,
 } from "react-icons/fi";
 
 import { useDashboard } from "@/context/DashboardContext";
 import { getAccounts } from "@/service/accountApi";
+import { takeDeliveryBoyPayout } from "@/service/dashboardApi";
+import { getErrorMessage } from "@/utils/errorMessage";
 import PageLoader, { ButtonLoader } from "../components/ui/Loader";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
@@ -69,6 +77,34 @@ const methodColors = {
   MIXED: "bg-fuchsia-300",
   PENDING: "bg-zinc-500",
 };
+
+const methodChartColors = {
+  CASH: "#6ee7b7",
+  GPAY: "#7dd3fc",
+  CREDIT: "#fcd34d",
+  SHOP_CREDIT: "#fb923c",
+  CUSTOMER_CREDIT: "#c4b5fd",
+  MIXED: "#f0abfc",
+  PENDING: "#71717a",
+};
+
+const chartSeries = [
+  {
+    key: "revenue",
+    label: "Billed",
+    color: "#38bdf8",
+  },
+  {
+    key: "collected",
+    label: "Collected",
+    color: "#6ee7b7",
+  },
+  {
+    key: "credit",
+    label: "Credit",
+    color: "#fcd34d",
+  },
+];
 
 const typeLabels = {
   PAYMENT: "Paid",
@@ -142,7 +178,11 @@ const PeriodSwitch = ({ value, onChange }) => (
 );
 
 const PaymentBreakdown = ({ data, totalRevenue }) => {
-  const maxBilled = Math.max(1, ...data.map((item) => Number(item.billed || 0)));
+  const chartData = data.map((item) => ({
+    ...item,
+    name: methodLabels[item.method] || item.method || "Pending",
+    value: Number(item.billed || 0),
+  }));
 
   return (
     <section className="rounded-2xl border border-white/10 bg-zinc-950/70">
@@ -161,16 +201,47 @@ const PaymentBreakdown = ({ data, totalRevenue }) => {
           No payment data yet
         </div>
       ) : (
-        <div className="divide-y divide-white/5">
+        <div className="grid gap-1 p-4 sm:p-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={54}
+                  outerRadius={88}
+                  paddingAngle={3}
+                >
+                  {chartData.map((item) => (
+                    <Cell
+                      key={item.method || item.name}
+                      fill={methodChartColors[item.method] || "#a1a1aa"}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name) => [formatCurrency(value), name]}
+                  contentStyle={{
+                    background: "#09090b",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                    color: "#fff",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="divide-y divide-white/5">
           {data.map((item) => {
             const method = item.method || "PENDING";
             const billed = Number(item.billed || 0);
-            const width = Math.max(4, Math.round((billed / maxBilled) * 100));
             const share =
               totalRevenue > 0 ? Math.round((billed / totalRevenue) * 100) : 0;
 
             return (
-              <div key={method} className="px-4 py-4 sm:px-5">
+              <div key={method} className="py-3">
                 <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -209,18 +280,10 @@ const PaymentBreakdown = ({ data, totalRevenue }) => {
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-900">
-                  <div
-                    className={`h-full rounded-full ${
-                      methodColors[method] || "bg-zinc-400"
-                    }`}
-                    style={{ width: `${width}%` }}
-                  />
-                </div>
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </section>
@@ -336,7 +399,7 @@ const ReportSummary = ({ label, report }) => {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricCard
           icon={FiShoppingBag}
           label="Orders"
@@ -364,6 +427,60 @@ const ReportSummary = ({ label, report }) => {
     </section>
   );
 };
+
+const DeliveryBoyPayout = ({ payout, takingPayout, onTakePayout }) => (
+  <section className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4 sm:p-5">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div>
+        <div className="inline-flex items-center gap-2 rounded-full bg-sky-400/10 px-3 py-1 text-xs font-medium text-sky-300">
+          <FiTruck />
+          Delivery boy payout
+        </div>
+        <h2 className="mt-3 font-semibold text-white">
+          {formatCurrency(payout?.payoutPerOrder || 10)} per order
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Remaining after payout: {formatCurrency(payout?.pendingPayout)}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onTakePayout}
+        disabled={takingPayout || Number(payout?.pendingPayout || 0) <= 0}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-300 px-4 text-sm font-bold text-zinc-950 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {takingPayout ? <ButtonLoader label="Taking" /> : "Take payout"}
+      </button>
+    </div>
+
+    <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <MetricCard
+        icon={FiShoppingBag}
+        label="Orders"
+        value={formatNumber(payout?.totalOrders)}
+      />
+      <MetricCard
+        icon={FiDollarSign}
+        label="Total payout"
+        value={formatCurrency(payout?.totalPayout)}
+        tone="text-sky-300"
+      />
+      <MetricCard
+        icon={FiCreditCard}
+        label="Paid"
+        value={formatCurrency(payout?.paidPayout)}
+        tone="text-emerald-300"
+      />
+      <MetricCard
+        icon={FiTrendingUp}
+        label="Remaining"
+        value={formatCurrency(payout?.pendingPayout)}
+        tone="text-amber-300"
+      />
+    </div>
+  </section>
+);
 
 const AccountsPreview = ({ transactions = [] }) => (
   <section className="rounded-2xl border border-white/10 bg-zinc-950/70">
@@ -416,6 +533,11 @@ const AccountsPreview = ({ transactions = [] }) => (
               <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
                 {methodLabels[transaction.method] || transaction.method}
               </span>
+              {Number(transaction.customerCreditCreated || 0) > 0 && (
+                <span className="rounded-full bg-violet-500/10 px-2 py-1 text-xs text-violet-300">
+                  Customer credit +{formatCurrency(transaction.customerCreditCreated)}
+                </span>
+              )}
             </div>
 
             <div className="font-bold text-white md:text-right">
@@ -439,6 +561,7 @@ export default function ReportsPage() {
   } = useDashboard();
   const [period, setPeriod] = useState("daily");
   const [accountTransactions, setAccountTransactions] = useState([]);
+  const [takingPayout, setTakingPayout] = useState(false);
 
   const loadAccountPreview = useCallback(async () => {
     try {
@@ -456,6 +579,7 @@ export default function ReportsPage() {
   const activeReport = period === "daily" ? dailyReport : monthlyReport;
   const activeChart = period === "daily" ? dailyChart : monthlyChart;
   const totalRevenue = Number(activeReport?.totalRevenue || 0);
+  const activePayout = activeReport?.deliveryBoyPayout || {};
 
   const chartData = useMemo(
     () =>
@@ -481,7 +605,7 @@ export default function ReportsPage() {
   );
 
   useEffect(() => {
-    loadAccountPreview();
+    const timeoutId = window.setTimeout(loadAccountPreview, 0);
 
     const refreshIfVisible = () => {
       if (document.visibilityState === "visible") {
@@ -495,11 +619,33 @@ export default function ReportsPage() {
     document.addEventListener("visibilitychange", refreshIfVisible);
 
     return () => {
+      window.clearTimeout(timeoutId);
       window.clearInterval(intervalId);
       window.removeEventListener("focus", refreshIfVisible);
       document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [loadAccountPreview]);
+
+  const handleTakePayout = async () => {
+    try {
+      setTakingPayout(true);
+      const response = await takeDeliveryBoyPayout({
+        period,
+      });
+      const paidAmount = response.data?.paidAmount || 0;
+
+      toast.success(`Payout taken: ${formatCurrency(paidAmount)}`);
+      await Promise.all([
+        loadDashboard({ showLoading: true }),
+        loadAccountPreview(),
+      ]);
+    } catch (error) {
+      console.error(error);
+      toast.error(getErrorMessage(error, "Failed to take payout"));
+    } finally {
+      setTakingPayout(false);
+    }
+  };
 
   if (loading) {
     return <PageLoader label="Loading reports" />;
@@ -548,6 +694,12 @@ export default function ReportsPage() {
       </header>
 
       <ReportSummary label={activePeriod.eyebrow} report={activeReport} />
+
+      <DeliveryBoyPayout
+        payout={activePayout}
+        takingPayout={takingPayout}
+        onTakePayout={handleTakePayout}
+      />
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <PaymentBreakdown data={breakdownData} totalRevenue={totalRevenue} />

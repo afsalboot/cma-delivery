@@ -37,6 +37,8 @@ export const receivePaymentService = async ({
   deliveryId,
   amount,
   method,
+  cashAmount = 0,
+  gpayAmount = 0,
   changeGiven = 0,
 }) => {
   const delivery = await Delivery.findById(deliveryId);
@@ -83,17 +85,50 @@ export const receivePaymentService = async ({
     Number(customer.totalCredit || 0) + creditDifference,
   );
 
-  await Transaction.create({
-    delivery: delivery._id,
-    customer: customer._id,
-    amount,
-    method,
-    type: "PAYMENT",
-    notes:
-      delivery.changeGiven > 0
-        ? `Give change ${delivery.changeGiven}`
-        : "",
-  });
+  const paymentNotes =
+    delivery.changeGiven > 0
+      ? `Give change ${delivery.changeGiven}`
+      : "";
+  const splitCashAmount = Number(cashAmount || 0);
+  const splitGpayAmount = Number(gpayAmount || 0);
+  const hasSplitPayment =
+    method === "MIXED" && (splitCashAmount > 0 || splitGpayAmount > 0);
+
+  if (hasSplitPayment) {
+    const splitTransactions = [
+      splitCashAmount > 0
+        ? {
+            delivery: delivery._id,
+            customer: customer._id,
+            amount: splitCashAmount,
+            method: "CASH",
+            type: "PAYMENT",
+            notes: paymentNotes || "Split payment: cash",
+          }
+        : null,
+      splitGpayAmount > 0
+        ? {
+            delivery: delivery._id,
+            customer: customer._id,
+            amount: splitGpayAmount,
+            method: "GPAY",
+            type: "PAYMENT",
+            notes: paymentNotes || "Split payment: GPay",
+          }
+        : null,
+    ].filter(Boolean);
+
+    await Transaction.create(splitTransactions);
+  } else {
+    await Transaction.create({
+      delivery: delivery._id,
+      customer: customer._id,
+      amount,
+      method,
+      type: "PAYMENT",
+      notes: paymentNotes,
+    });
+  }
 
   await syncShopCreditTransaction({
     delivery,

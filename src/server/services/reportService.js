@@ -1,14 +1,92 @@
 import Delivery from "../models/Delivery";
 
-const generateReport = async (startDate) => {
-  const [report, paymentBreakdown] = await Promise.all([
-    Delivery.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: startDate,
+const DELIVERY_BOY_PAYOUT_PER_ORDER = 10;
+
+const getDeliveryBoyPayoutSummary = async () => {
+  const payoutSummary = await Delivery.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalOrders: {
+          $sum: 1,
+        },
+        paidOrders: {
+          $sum: {
+            $cond: ["$deliveryBoyPayoutPaid", 1, 0],
           },
         },
+        pendingOrders: {
+          $sum: {
+            $cond: ["$deliveryBoyPayoutPaid", 0, 1],
+          },
+        },
+        paidPayout: {
+          $sum: {
+            $cond: [
+              "$deliveryBoyPayoutPaid",
+              {
+                $ifNull: [
+                  "$deliveryBoyPayoutAmount",
+                  DELIVERY_BOY_PAYOUT_PER_ORDER,
+                ],
+              },
+              0,
+            ],
+          },
+        },
+        pendingPayout: {
+          $sum: {
+            $cond: [
+              "$deliveryBoyPayoutPaid",
+              0,
+              {
+                $ifNull: [
+                  "$deliveryBoyPayoutAmount",
+                  DELIVERY_BOY_PAYOUT_PER_ORDER,
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        totalOrders: 1,
+        paidOrders: 1,
+        pendingOrders: 1,
+        payoutPerOrder: {
+          $literal: DELIVERY_BOY_PAYOUT_PER_ORDER,
+        },
+        totalPayout: "$pendingPayout",
+        paidPayout: 1,
+        pendingPayout: 1,
+      },
+    },
+  ]);
+
+  return payoutSummary[0] || {
+    totalOrders: 0,
+    paidOrders: 0,
+    pendingOrders: 0,
+    payoutPerOrder: DELIVERY_BOY_PAYOUT_PER_ORDER,
+    totalPayout: 0,
+    paidPayout: 0,
+    pendingPayout: 0,
+  };
+};
+
+const generateReport = async (startDate) => {
+  const matchPeriod = {
+    createdAt: {
+      $gte: startDate,
+    },
+  };
+  const [report, paymentBreakdown, deliveryBoyPayout] = await Promise.all([
+    Delivery.aggregate([
+      {
+        $match: matchPeriod,
       },
       {
         $group: {
@@ -39,11 +117,7 @@ const generateReport = async (startDate) => {
     ]),
     Delivery.aggregate([
       {
-        $match: {
-          createdAt: {
-            $gte: startDate,
-          },
-        },
+        $match: matchPeriod,
       },
       {
         $group: {
@@ -81,6 +155,7 @@ const generateReport = async (startDate) => {
         },
       },
     ]),
+    getDeliveryBoyPayoutSummary(),
   ]);
 
   return {
@@ -91,6 +166,7 @@ const generateReport = async (startDate) => {
       totalCredit: 0,
     }),
     paymentBreakdown,
+    deliveryBoyPayout,
   };
 };
 
@@ -108,6 +184,36 @@ export const getMonthlyReportService = async () => {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
   return generateReport(start);
+};
+
+export const takeDeliveryBoyPayoutService = async () => {
+  const match = {
+    deliveryBoyPayoutPaid: {
+      $ne: true,
+    },
+  };
+
+  const pendingOrders = await Delivery.countDocuments(match);
+
+  if (pendingOrders <= 0) {
+    return {
+      paidOrders: 0,
+      paidAmount: 0,
+    };
+  }
+
+  await Delivery.updateMany(match, {
+    $set: {
+      deliveryBoyPayoutAmount: DELIVERY_BOY_PAYOUT_PER_ORDER,
+      deliveryBoyPayoutPaid: true,
+      deliveryBoyPayoutPaidAt: new Date(),
+    },
+  });
+
+  return {
+    paidOrders: pendingOrders,
+    paidAmount: pendingOrders * DELIVERY_BOY_PAYOUT_PER_ORDER,
+  };
 };
 
 export const getDailyRevenueChartService = async () => {
